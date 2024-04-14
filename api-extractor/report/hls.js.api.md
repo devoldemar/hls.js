@@ -3397,6 +3397,7 @@ export interface TrackSet {
 // @public (undocumented)
 export type TSDemuxerConfig = {
     forceKeyFrameOnDiscontinuity: boolean;
+    videoOnly?: boolean;
 };
 
 // Warning: (ae-missing-release-tag) "UriReplacement" is part of the package's API, but it is missing a release tag (@alpha, @beta, @public, or @internal)

@@ -72,6 +72,7 @@ class TSDemuxer implements Demuxer {
   private aacOverFlow: AudioFrame | null = null;
   private remainderData: Uint8Array | null = null;
   private videoParser: BaseVideoParser | null;
+  private videoOnly: boolean = false;
 
   constructor(
     observer: HlsEventEmitter,
@@ -82,6 +83,9 @@ class TSDemuxer implements Demuxer {
     this.config = config;
     this.typeSupported = typeSupported;
     this.videoParser = null;
+    if (typeof this.config.videoOnly === 'boolean') {
+      this.videoOnly = this.config.videoOnly;
+    }
   }
 
   static probe(data: Uint8Array) {
@@ -295,9 +299,9 @@ class TSDemuxer implements Demuxer {
                       this.videoParser = new AvcVideoParser();
                       break;
                     case 'hevc':
-                      if (__USE_M2TS_ADVANCED_CODECS__) {
-                        this.videoParser = new HevcVideoParser();
-                      }
+                      //if (__USE_M2TS_ADVANCED_CODECS__) {
+                      this.videoParser = new HevcVideoParser();
+                      //}
                       break;
                   }
                 }
@@ -334,6 +338,9 @@ class TSDemuxer implements Demuxer {
                       this.parseAC3PES(audioTrack, pes);
                     }
                     break;
+                }
+                if (this.videoOnly) {
+                  audioTrack.pid = audioPid = -1;
                 }
               }
               audioData = { data: [], size: 0 };
@@ -374,6 +381,7 @@ class TSDemuxer implements Demuxer {
               offset,
               this.typeSupported,
               isSampleAes,
+              this.videoOnly,
             );
 
             // only update track id if track PID found while parsing PMT
@@ -487,9 +495,9 @@ class TSDemuxer implements Demuxer {
             this.videoParser = new AvcVideoParser();
             break;
           case 'hevc':
-            if (__USE_M2TS_ADVANCED_CODECS__) {
-              this.videoParser = new HevcVideoParser();
-            }
+            //if (__USE_M2TS_ADVANCED_CODECS__) {
+            this.videoParser = new HevcVideoParser();
+            //}
             break;
         }
       }
@@ -508,7 +516,7 @@ class TSDemuxer implements Demuxer {
       videoTrack.pesData = videoData;
     }
 
-    if (audioData && (pes = parsePES(audioData))) {
+    if (audioData && !this.videoOnly && (pes = parsePES(audioData))) {
       switch (audioTrack.segmentCodec) {
         case 'aac':
           this.parseAACPES(audioTrack, pes);
@@ -523,7 +531,7 @@ class TSDemuxer implements Demuxer {
           break;
       }
       audioTrack.pesData = null;
-    } else {
+    } else if (!this.videoOnly) {
       if (audioData?.size) {
         logger.log(
           'last AAC PES packet truncated,might overlap between fragments',
@@ -627,6 +635,11 @@ class TSDemuxer implements Demuxer {
         reason = `AAC PES did not start with ADTS header,offset:${offset}`;
       } else {
         reason = 'No ADTS header found in AAC PES';
+      }
+      if (!track.config || !track.samples.length) {
+        console.warn(`${reason}`);
+        this.videoOnly = true;
+        return;
       }
       const error = new Error(reason);
       logger.warn(`parsing error: ${reason}`);
@@ -768,6 +781,7 @@ function parsePMT(
   offset: number,
   typeSupported: TypeSupported,
   isSampleAes: boolean,
+  videoOnly?: boolean,
 ) {
   const result = {
     audioPid: -1,
@@ -796,7 +810,7 @@ function parsePMT(
       /* falls through */
       case 0x0f: // ISO/IEC 13818-7 ADTS AAC (MPEG-2 lower bit-rate audio)
         // logger.log('AAC PID:'  + pid);
-        if (result.audioPid === -1) {
+        if (result.audioPid === -1 && !videoOnly) {
           result.audioPid = pid;
         }
 
@@ -833,7 +847,7 @@ function parsePMT(
         // logger.log('MPEG PID:'  + pid);
         if (!typeSupported.mpeg && !typeSupported.mp3) {
           logger.log('MPEG audio found, not supported in this browser');
-        } else if (result.audioPid === -1) {
+        } else if (result.audioPid === -1 && !videoOnly) {
           result.audioPid = pid;
           result.segmentAudioCodec = 'mp3';
         }
@@ -849,7 +863,7 @@ function parsePMT(
         if (__USE_M2TS_ADVANCED_CODECS__) {
           if (!typeSupported.ac3) {
             logger.log('AC-3 audio found, not supported in this browser');
-          } else if (result.audioPid === -1) {
+          } else if (result.audioPid === -1 && !videoOnly) {
             result.audioPid = pid;
             result.segmentAudioCodec = 'ac3';
           }
@@ -901,15 +915,15 @@ function parsePMT(
         break;
 
       case 0x24: // ITU-T Rec. H.265 and ISO/IEC 23008-2 (HEVC)
-        if (__USE_M2TS_ADVANCED_CODECS__) {
-          if (result.videoPid === -1) {
-            result.videoPid = pid;
-            result.segmentVideoCodec = 'hevc';
-            logger.log('HEVC in M2TS found');
-          }
-        } else {
-          logger.warn('Unsupported HEVC in M2TS found');
+        //if (__USE_M2TS_ADVANCED_CODECS__) {
+        if (result.videoPid === -1) {
+          result.videoPid = pid;
+          result.segmentVideoCodec = 'hevc';
+          logger.log('HEVC in M2TS found');
         }
+        //} else {
+        //  logger.warn('Unsupported HEVC in M2TS found');
+        //}
         break;
 
       default:

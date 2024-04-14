@@ -113,12 +113,13 @@ class XhrLoader implements Loader<LoaderContext> {
         })
         .catch((error: Error) => {
           // IE11 throws an exception on xhr.open if attempting to access an HTTP resource over HTTPS
-          this.callbacks!.onError(
-            { code: xhr.status, text: error.message },
-            context,
-            xhr,
-            stats,
-          );
+          this &&
+            this.callbacks!.onError(
+              { code: xhr.status, text: error.message },
+              context,
+              xhr,
+              stats,
+            );
           return;
         });
     } else {

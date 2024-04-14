@@ -16,6 +16,7 @@ const pkgJson = JSON.parse(
 const BUILD_TYPE = {
   full: 'full',
   light: 'light',
+  cctv: 'cctv',
 };
 
 const FORMAT = {
@@ -27,6 +28,7 @@ const FORMAT = {
 const buildTypeToOutputName = {
   full: `hls`,
   light: `hls.light`,
+  cctv: 'cctv/hls',
 };
 
 /* Allow to customize builds through env-vars */
@@ -61,7 +63,9 @@ const buildConstants = (type, additional = {}) => ({
     __USE_EME_DRM__: JSON.stringify(type === BUILD_TYPE.full || addEMESupport),
     __USE_CMCD__: JSON.stringify(type === BUILD_TYPE.full || addCMCDSupport),
     __USE_CONTENT_STEERING__: JSON.stringify(
-      type === BUILD_TYPE.full || BUILD_TYPE.light || addContentSteeringSupport,
+      type === BUILD_TYPE.full ||
+        type === BUILD_TYPE.light ||
+        addContentSteeringSupport,
     ),
     __USE_VARIABLE_SUBSTITUTION__: JSON.stringify(
       type === BUILD_TYPE.full || addVariableSubstitutionSupport,
@@ -248,7 +252,7 @@ function getAliasesForLightDist() {
     aliases = {
       ...aliases,
       './ac3-demuxer': '../empty.js',
-      './video/hevc-video-parser': '../empty.js',
+      //'./video/hevc-video-parser': '../empty.js',
     };
   }
 
@@ -288,10 +292,12 @@ const buildRollupConfig = ({
       format,
       banner: shouldBundleWorker(format) ? workerFnBanner : null,
       footer: shouldBundleWorker(format) ? workerFnFooter : null,
-      sourcemap,
+      sourcemap: false,
+      /*
       sourcemapFile: minified
         ? `${outputName}.${extension}.min.map`
         : `${outputName}.${extension}.map`,
+      */
     },
     plugins: [
       ...basePlugins,
@@ -398,6 +404,11 @@ const configs = Object.entries({
       buildBabelLegacyBrowsers({ stripConsole: false }),
     ],
   },
+  cctv: buildRollupConfig({
+    type: BUILD_TYPE.cctv,
+    format: FORMAT.umd,
+    minified: true,
+  }),
 });
 
 module.exports = {

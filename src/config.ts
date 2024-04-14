@@ -261,6 +261,7 @@ export type TimelineControllerConfig = {
 
 export type TSDemuxerConfig = {
   forceKeyFrameOnDiscontinuity: boolean;
+  videoOnly?: boolean;
 };
 
 export type HlsConfig = {
